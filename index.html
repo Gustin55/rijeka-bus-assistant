@@ -1,1 +1,137 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mon Assistant Bus Rijeka</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col items-center justify-center p-4">
 
+  <div class="max-w-md w-full bg-slate-900 rounded-3xl shadow-2xl p-6 border border-slate-800 space-y-5">
+    
+    <!-- En-tête -->
+    <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+      <div>
+        <h1 class="text-xl font-bold text-sky-400">🚌 Rijeka Bus & Cours</h1>
+        <p id="last-sync" class="text-xs text-slate-400">En attente de synchronisation...</p>
+      </div>
+      <span id="status-dot" class="w-3.5 h-3.5 bg-amber-500 rounded-full animate-pulse" title="Statut"></span>
+    </div>
+
+    <!-- Carte Prochain Cours -->
+    <div class="bg-slate-800/70 rounded-2xl p-4 border border-slate-700/60">
+      <div class="flex justify-between items-center">
+        <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Prochain Cours (Google Agenda)</span>
+        <span id="course-date" class="text-xs bg-slate-700 px-2 py-0.5 rounded text-slate-300">--/--</span>
+      </div>
+      <h2 id="course-title" class="text-lg font-bold mt-2 text-white">Chargement...</h2>
+      <p id="course-location" class="text-sm text-slate-400 mt-0.5">📍 --</p>
+      <div class="mt-3 flex items-baseline gap-2">
+        <span id="course-time" class="text-2xl font-extrabold text-amber-400">--:--</span>
+        <span id="course-countdown" class="text-xs text-slate-400"></span>
+      </div>
+    </div>
+
+    <!-- Carte Bus Recommandé -->
+    <div class="bg-gradient-to-br from-sky-950/60 to-slate-900 rounded-2xl p-4 border border-sky-500/30">
+      <div class="flex justify-between items-center mb-2">
+        <span id="bus-line" class="font-bold text-lg text-sky-300">Ligne --</span>
+        <span id="bus-status" class="text-xs bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2.5 py-0.5 rounded-full font-semibold">Autotrolej</span>
+      </div>
+      <p class="text-sm text-slate-300">Arrêt de départ : <strong id="bus-stop" class="text-white">--</strong></p>
+      <div class="mt-3 flex items-baseline justify-between">
+        <div>
+          <span class="text-xs text-slate-400 block">Départ conseillé</span>
+          <span id="bus-time" class="text-3xl font-black text-emerald-400">--:--</span>
+        </div>
+        <span id="bus-wait" class="text-sm font-semibold text-sky-300">Dans -- min</span>
+      </div>
+    </div>
+
+    <!-- Boutons d'action -->
+    <div class="grid grid-cols-2 gap-3 pt-1">
+      <button onclick="fetchStatus()" class="bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold py-2.5 px-4 rounded-xl transition active:scale-95">
+        🔄 Actualiser
+      </button>
+      <button onclick="testWhatsApp()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 px-4 rounded-xl transition active:scale-95">
+        💬 Test WhatsApp
+      </button>
+    </div>
+
+    <!-- Configuration de l'URL Render -->
+    <details class="text-xs text-slate-400 pt-2 border-t border-slate-800">
+      <summary class="cursor-pointer hover:text-slate-200 font-medium">⚙️ Configurer l'URL du serveur Render</summary>
+      <div class="mt-3 space-y-2">
+        <input id="backend-url" type="url" placeholder="https://ton-projet.onrender.com" 
+               class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-sky-500">
+        <button onclick="saveBackendUrl()" class="w-full bg-slate-800 hover:bg-slate-700 text-white py-2 rounded-lg font-semibold">
+          Enregistrer l'URL
+        </button>
+      </div>
+    </details>
+
+  </div>
+
+  <script>
+    const urlInput = document.getElementById('backend-url');
+    urlInput.value = localStorage.getItem('render_url') || '';
+
+    function saveBackendUrl() {
+      const cleanUrl = urlInput.value.trim().replace(/\/$/, "");
+      localStorage.setItem('render_url', cleanUrl);
+      fetchStatus();
+    }
+
+    async function fetchStatus() {
+      const baseUrl = localStorage.getItem('render_url');
+      if (!baseUrl) {
+        document.getElementById('course-title').innerText = "Configure l'URL Render en bas ⚙️";
+        return;
+      }
+
+      try {
+        const res = await fetch(`${baseUrl}/api/status`);
+        const data = await res.json();
+
+        document.getElementById('status-dot').className = "w-3.5 h-3.5 bg-emerald-500 rounded-full";
+        document.getElementById('last-sync').innerText = `Mis à jour à ${data.last_check}`;
+
+        if (data.next_class) {
+          document.getElementById('course-title').innerText = data.next_class.summary;
+          document.getElementById('course-location').innerText = `📍 ${data.next_class.location}`;
+          document.getElementById('course-time').innerText = data.next_class.start_time;
+          document.getElementById('course-date').innerText = data.next_class.date_str;
+          document.getElementById('course-countdown').innerText = `(dans ${data.next_class.minutes_until} min)`;
+        } else {
+          document.getElementById('course-title').innerText = "Aucun cours dans les 48h 🎉";
+          document.getElementById('course-location').innerText = "Repos !";
+          document.getElementById('course-time').innerText = "--:--";
+          document.getElementById('course-countdown').innerText = "";
+        }
+
+        if (data.bus_recommendation) {
+          document.getElementById('bus-line').innerText = data.bus_recommendation.line;
+          document.getElementById('bus-stop').innerText = data.bus_recommendation.stop;
+          document.getElementById('bus-time').innerText = data.bus_recommendation.departure_time;
+          document.getElementById('bus-wait').innerText = `Dans ${data.bus_recommendation.wait_minutes} min`;
+        }
+      } catch (err) {
+        document.getElementById('status-dot').className = "w-3.5 h-3.5 bg-rose-500 rounded-full";
+        document.getElementById('last-sync').innerText = "Serveur Render en réveil (patiente 30s)...";
+      }
+    }
+
+    async function testWhatsApp() {
+      const baseUrl = localStorage.getItem('render_url');
+      if (!baseUrl) return alert("Configure d'abord l'URL Render en bas de la page !");
+      const res = await fetch(`${baseUrl}/api/test-whatsapp`, { method: 'POST' });
+      const data = await res.json();
+      alert(data.success ? "Message WhatsApp envoyé ! Vérifie ton téléphone." : "Erreur : vérifie tes clés CallMeBot sur Render.");
+    }
+
+    fetchStatus();
+    setInterval(fetchStatus, 60000);
+  </script>
+</body>
+</html>

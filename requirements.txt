@@ -1,1 +1,6 @@
-
+fastapi==0.115.0
+uvicorn==0.30.6
+requests==2.32.3
+icalendar==5.0.13
+recurring-ical-events==3.3.0
+pytz==2024.2
